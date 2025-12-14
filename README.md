@@ -41,26 +41,6 @@ TTS_VOICE_ID=your_voice_id  # Optional, uses default if not set
 uv run src/services/translation_pipeline.py
 ```
 
-### 4. Run with Web UI (Optional)
-
-```bash
-uv run src/services/translation_ui.py
-# Open http://127.0.0.1:7860
-```
-
-## Project Structure
-
-```
-FlowTalk/
-├── src/services/
-│   ├── audio_capture.py         # Microphone streaming
-│   ├── translation_pipeline.py  # Main pipeline (CLI)
-│   └── translation_ui.py        # Gradio web interface
-├── records/                     # Session transcripts
-├── .env                         # API keys (not committed)
-└── pyproject.toml              # Dependencies
-```
-
 ## Architecture
 
 ```
