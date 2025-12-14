@@ -13,6 +13,13 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+import numpy as np
+import sounddevice as sd
 from src.services.audio_capture import microphone_stream
 
 # Configure logging
@@ -52,6 +59,11 @@ async def main():
     client = gradium.client.GradiumClient(api_key=api_key)
     logger.info("Gradium client initialized.")
 
+    # Create a separate client for TTS to avoid "WebSocket limit exceeded" if it's per-socket
+    # If it's per-API-key limitation of 1, this won't help and we'll need half-duplex.
+    tts_client = gradium.client.GradiumClient(api_key=api_key)
+    logger.info("Gradium TTS client initialized.")
+
     # 3. Start Pipeline
     logger.info("Starting pipeline. Speak into the microphone (French)...")
 
@@ -71,7 +83,7 @@ async def main():
         queue = asyncio.Queue()
         
         # Start the consumer task
-        consumer_task = asyncio.create_task(process_buffer_and_translate(queue, translator))
+        consumer_task = asyncio.create_task(process_buffer_and_translate(queue, translator, tts_client))
 
         # Producer loop
         async for text_segment in stream.iter_text():
@@ -93,7 +105,7 @@ async def main():
     except Exception as e:
         logger.error(f"Pipeline error: {e}")
 
-async def process_buffer_and_translate(queue, translator):
+async def process_buffer_and_translate(queue, translator, client):
     buffer = []
     LAG_SECONDS = 0.5
     
@@ -123,6 +135,38 @@ async def process_buffer_and_translate(queue, translator):
                 print(f"\n[Transcription]: {full_text}")
                 print(f"[Translation]:   {translated_text}")
                 print("-" * 40)
+                
+                # TTS
+                try:
+                    # Using "pcm" format as per documentation for streaming/raw usage
+                    # Docs say: 48kHz, 16-bit signed integer, mono
+                    tts_result = await client.tts(
+                         setup={
+                             "model_name": "default",
+                             "voice_id": "YTpq7expH9539ERJ", # Using default/example voice
+                             "output_format": "pcm"
+                         },
+                         text=translated_text
+                    )
+                    
+                    # specific method mentioned in docs: result.pcm16() or manual
+                    # Let's try manual from raw_data if pcm16() isn't standard, 
+                    # but docs said `pcm16_array = result.pcm16()` exists.
+                    # Safety check:
+                    if hasattr(tts_result, 'pcm16'):
+                        audio_data = tts_result.pcm16()
+                    else:
+                        # Fallback based on "16-bit signed integer (little-endian)"
+                        audio_data = np.frombuffer(tts_result.raw_data, dtype=np.int16)
+
+                    # Play audio
+                    # Sample rate 48000 as per docs
+                    sd.play(audio_data, samplerate=48000)
+                    sd.wait() # Block this task until audio finishes to prevent overlap logic issues 
+                              # (or we could overlap, but simple is better first)
+                    
+                except Exception as tts_error:
+                   logger.error(f"TTS Error: {tts_error}")
                 
                 buffer = []
                 
