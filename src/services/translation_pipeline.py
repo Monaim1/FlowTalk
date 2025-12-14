@@ -9,15 +9,12 @@ from transformers import MarianMTModel, MarianTokenizer
 import gradium
 from dotenv import load_dotenv
 
-# Add project root to sys.path to allow imports from src
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.services.audio_capture import microphone_stream
 
-# Load environment variables
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -66,19 +63,15 @@ async def process_buffer_and_translate(queue, translator, client, recorder):
     buffer = []
     LAG_SECONDS = 0.5
     
-    # Get Voice ID from env or default
     voice_id = os.getenv("TTS_VOICE_ID", "wzsx4FjdulIY7oBs")
     
     while True:
         try:
-            # Wait for the first item
             first_item = await queue.get()
             buffer.append(first_item)
             
-            # Keep collecting items until timeout
             while True:
                 try:
-                    # Wait for next item with timeout
                     next_item = await asyncio.wait_for(queue.get(), timeout=LAG_SECONDS)
                     buffer.append(next_item)
                 except asyncio.TimeoutError:

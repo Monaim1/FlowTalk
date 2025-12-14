@@ -9,4 +9,3 @@ inputs = tokenizer(text, return_tensors="pt")
 translated = model.generate(**inputs)
 
 print(tokenizer.decode(translated[0], skip_special_tokens=True))
-
